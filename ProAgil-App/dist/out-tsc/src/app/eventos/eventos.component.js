@@ -6,12 +6,13 @@ let EventosComponent = class EventosComponent {
     //  { Evento: 3, Tema: 'Angular e Asp.Net Core', Local: 'Curitiba' }]
     constructor(http) {
         this.http = http;
+        this.eventos = []; //  =[{ Evento: 1, Tema: 'Angular', Local: 'São Paulo' },
     }
     ngOnInit() {
         this.getEventos();
     }
     getEventos() {
-        this.http.get('https://localhost:44367/api/values').subscribe(response => { this.eventos = response; }, error => { console.log(error); });
+        this.http.get('http://localhost:5000/api/values').subscribe(response => { this.eventos = response; }, error => { console.log(error); });
     }
 };
 EventosComponent = tslib_1.__decorate([
