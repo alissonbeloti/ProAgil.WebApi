@@ -1,3 +1,6 @@
+using System.Reflection;
+using System.Text;
+using System.Security.Cryptography;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +15,18 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using ProAgil.WebApi.Model;
+using ProAgil.Repository.Model;
+using ProAgil.Repository;
+using AutoMapper;
+using System.IO;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using ProAgil.Domain.Identity;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Identity;
 namespace ProAgil.WebApi
 {
   public class Startup
@@ -27,12 +41,47 @@ namespace ProAgil.WebApi
     // This method gets called by the runtime. Use this method to add services to the container.
     public void ConfigureServices(IServiceCollection services)
     {
-      services.AddDbContext<DataContext>(
+      services.AddDbContext<ProAgilContext>(
           x => { x.UseSqlite(Configuration.GetConnectionString("DefaultConnection")); }
           );
-      services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
-      //Permissão para o Angular obter informações da webapi
+
+      // Configurações para a Api só possa ser consumida, com o usuário logado.
+      IdentityBuilder builder = services.AddIdentityCore<User>(options => {
+        options.Password.RequireDigit = false;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequireLowercase = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequiredLength = 4;
+        
+      });
+
+      builder = new IdentityBuilder(builder.UserType, typeof(Role), builder.Services);
+      builder.AddEntityFrameworkStores<ProAgilContext>();
+      builder.AddRoleValidator<RoleValidator<Role>>();
+      builder.AddRoleManager<RoleManager<Role>>();
+      builder.AddSignInManager<SignInManager<User>>();
+
+      services.AddMvc(option => {
+        var policy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+        option.Filters.Add(new AuthorizeFilter(policy));
+      })
+      .SetCompatibilityVersion(CompatibilityVersion.Version_2_2)
+      .AddJsonOptions(opt => opt.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore);
+      services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+      .AddJwtBearer(options => {
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters(){
+          ValidateIssuerSigningKey = true,
+          IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII
+          .GetBytes(Configuration.GetSection("AppSettings:Token").Value)),
+          ValidateAudience = false,
+          ValidateIssuer = false,
+        };
+      });
+
+      services.AddScoped<IProAgilRepository, ProAgilRepository>();
+      services.AddAutoMapper();
       services.AddCors();
+      //Permissão para o Angular obter informações da webapi
     }
 
     // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -47,10 +96,13 @@ namespace ProAgil.WebApi
         // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
         app.UseHsts();
       }
-
+      app.UseAuthentication();
       //app.UseHttpsRedirection();
       app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-      app.UseStaticFiles();
+      app.UseStaticFiles(new StaticFileOptions() {
+        FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), @"Resources"))
+        , RequestPath = new PathString("/Resources")
+      });
       app.UseMvc();
     }
   }

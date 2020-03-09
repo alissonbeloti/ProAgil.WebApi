@@ -4,17 +4,19 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using ProAgil.WebApi.Model;
+using ProAgil.Domain;
 using Microsoft.AspNetCore.Http;
+using ProAgil.Repository.Model;
+
 namespace ProAgil.WebApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     public class ValuesController : ControllerBase
     {
-        public DataContext Context { get; }
+        public ProAgilContext Context { get; }
 
-        public ValuesController(DataContext context)
+        public ValuesController(ProAgilContext context)
         {
             this.Context = context;
         }
@@ -24,13 +26,13 @@ namespace ProAgil.WebApi.Controllers
         {
             try
             {
-                return Ok(await Context.Eventos.ToListAsync());    
+                return Ok(await Context.Eventos.ToListAsync());
             }
             catch (System.Exception)
             {
                 return this.StatusCode(StatusCodes.Status500InternalServerError, "Bando de dados falhou!");
             }
-            
+
         }
 
         // GET api/values/5
@@ -43,10 +45,10 @@ namespace ProAgil.WebApi.Controllers
             }
             catch (System.Exception)
             {
-                
+
                 return BadRequest();
             }
-            
+
         }
 
         // POST api/values
